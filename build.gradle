@@ -1,0 +1,75 @@
+import org.jetbrains.kotlin.gradle.dsl.JvmTarget
+import org.jetbrains.kotlin.gradle.tasks.KotlinJvmCompile
+
+buildscript {
+	repositories {
+		mavenCentral()
+	}
+	dependencies {
+		classpath libs.kotlin.gradlePlugin
+		classpath libs.spotless.gradlePlugin
+	}
+}
+
+apply plugin: 'org.jetbrains.kotlin.jvm'
+apply plugin: 'application'
+
+application {
+	mainClass = 'com.jakewharton.videoswatch.Main'
+	applicationDefaultJvmArgs = [
+		'--enable-preview',
+		'--enable-native-access=ALL-UNNAMED',
+	]
+	applicationDistribution.from(new File(projectDir, "src/main")) {
+		include('native/**')
+	}
+}
+
+dependencies {
+	implementation libs.clikt
+}
+
+tasks.named("distTar").configure { task ->
+	task.enabled = false
+}
+tasks.named("assemble").configure { task ->
+	task.dependsOn(tasks.named("installDist"))
+}
+
+tasks.withType(KotlinJvmCompile).configureEach { task ->
+	task.compilerOptions {
+		jvmTarget = JvmTarget.JVM_21
+		freeCompilerArgs.addAll(
+				'-progressive',
+		)
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	options.compilerArgs += "--enable-preview"
+}
+
+java {
+	sourceSets.main.java.srcDir('src/main/headers')
+	toolchain {
+		languageVersion = JavaLanguageVersion.of(21)
+		vendor = JvmVendorSpec.AZUL
+	}
+}
+
+kotlin {
+	sourceSets.configureEach {
+		languageSettings.optIn("kotlin.ExperimentalStdlibApi")
+		languageSettings.optIn("kotlin.contracts.ExperimentalContracts")
+	}
+}
+
+apply plugin: 'com.diffplug.spotless'
+spotless {
+	kotlin {
+		target("src/**/*.kt")
+		ktlint(libs.ktlint.get().version).editorConfigOverride([
+			'ktlint_standard_filename': 'disabled',
+		])
+	}
+}
