@@ -1,6 +1,6 @@
 package com.jakewharton.videoswatch
 
-import java.util.concurrent.atomic.AtomicBoolean
+import kotlin.concurrent.AtomicInt
 import kotlin.contracts.InvocationKind.EXACTLY_ONCE
 import kotlin.contracts.contract
 
@@ -21,9 +21,9 @@ internal class Closer : AutoCloseable {
 	private class ActionCloseable(
 		private val action: () -> Unit,
 	) : AutoCloseable {
-		private val closed = AtomicBoolean()
+		private val closed = AtomicInt(0)
 		override fun close() {
-			if (closed.compareAndSet(false, true)) {
+			if (closed.compareAndSet(0, 1)) {
 				action()
 			}
 		}
@@ -90,8 +90,8 @@ internal class Closer : AutoCloseable {
 }
 
 internal class CloserScope(val closer: Closer) {
-	fun <R : AutoCloseable> R.useInScope(): R = also(closer::plusAssign)
-	fun <R> R.useWithClose(action: (R) -> Unit): R = apply {
+	fun <R : AutoCloseable> R.scopedUse(): R = also(closer::plusAssign)
+	fun <R> R.scopedUseWithClose(action: (R) -> Unit): R = apply {
 		closer += { action(this) }
 	}
 }

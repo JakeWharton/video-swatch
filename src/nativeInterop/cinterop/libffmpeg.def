@@ -1,0 +1,17 @@
+package=com.jakewharton.videoswatch.ffmpeg
+headers=libavcodec/avcodec.h libavformat/avformat.h libavutil/imgutils.h libswscale/swscale.h
+libraryPaths=/opt/homebrew/opt/ffmpeg/lib
+compilerOpts=-I/opt/homebrew/opt/ffmpeg/include
+linkerOpts=-L/opt/homebrew/opt/ffmpeg/lib -lavcodec -lavformat -lavutil -lswscale
+
+---
+
+static void avformat_close_input2(AVFormatContext* ref) {
+	AVFormatContext* copy = ref;
+	avformat_close_input(&copy);
+}
+
+static void avcodec_free_context2(AVCodecContext* ref) {
+	AVCodecContext* copy = ref;
+	avcodec_free_context(&copy);
+}
