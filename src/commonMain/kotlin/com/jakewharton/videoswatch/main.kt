@@ -147,9 +147,47 @@ private class SwatchCommand(
 			var groupGreenSum = 0.0
 			var groupBlueSum = 0.0
 
-			var frameIndex = 0
 			val colors = mutableListOf<RgbColor>()
+			fun checkForCompleteGroup(done: Boolean = false) {
+				val isComplete = groupRemainingFrames < 0
+				val isHalfway = frameRate - groupRemainingFrames > groupRemainingFrames
+				if (isComplete || done && isHalfway) {
+					val groupPixelCount = groupFrameCount * framePixelCount
 
+					val redMean = sqrt(groupRedSum / groupPixelCount).toInt()
+					val greenMean = sqrt(groupGreenSum / groupPixelCount).toInt()
+					val blueMean = sqrt(groupBlueSum / groupPixelCount).toInt()
+					val color = RgbColor(
+						r = redMean.toUByte(),
+						g = greenMean.toUByte(),
+						b = blueMean.toUByte(),
+					)
+
+					debugLog {
+						"""
+						|COLOR $color
+						|  resolution = $width * $height = $framePixelCount
+						|  frames = $groupFrameCount
+						|  pixels = frames * resolution = $groupPixelCount
+						|  redSum = $groupRedSum
+						|  greenSum = $groupGreenSum
+						|  blueSum = $groupBlueSum
+						""".trimMargin()
+					}
+
+					colors += color
+
+					groupFrameCount = 0
+					// Add instead of assigning to retain fractional remainder.
+					groupRemainingFrames += frameRate
+
+					groupRedSum = 0.0
+					groupGreenSum = 0.0
+					groupBlueSum = 0.0
+				}
+			}
+
+			var frameIndex = 0
 			while (av_read_frame(formatContext, avPacket.ptr) >= 0) {
 				if (avPacket.stream_index == videoIndex) {
 					avcodec_send_packet(decoderContext, avPacket.ptr).checkReturn {
@@ -162,42 +200,9 @@ private class SwatchCommand(
 								val frameRgbValue = frameRgb.pointed
 
 								groupRemainingFrames--
-								if (groupRemainingFrames < 0) {
-									val groupPixelCount = groupFrameCount * framePixelCount
+								checkForCompleteGroup()
 
-									val redMean = sqrt(groupRedSum / groupPixelCount).toInt()
-									val greenMean = sqrt(groupGreenSum / groupPixelCount).toInt()
-									val blueMean = sqrt(groupBlueSum / groupPixelCount).toInt()
-									val color = RgbColor(
-										r = redMean.toUByte(),
-										g = greenMean.toUByte(),
-										b = blueMean.toUByte(),
-									)
-
-									debugLog {
-										"""
-										|COLOR $color
-										|  resolution = $width * $height = $framePixelCount
-										|  frames = $groupFrameCount
-										|  pixels = frames * resolution = $groupPixelCount
-										|  redSum = $groupRedSum
-										|  greenSum = $groupGreenSum
-										|  blueSum = $groupBlueSum
-										""".trimMargin()
-									}
-
-									colors += color
-
-									groupFrameCount = 0
-									// Add instead of assigning to retain fractional remainder.
-									groupRemainingFrames += frameRate
-
-									groupRedSum = 0.0
-									groupGreenSum = 0.0
-									groupBlueSum = 0.0
-								}
 								groupFrameCount++
-
 								debugLog {
 									"Processing frame $frameIndex (group size: $groupFrameCount, remaining: $groupRemainingFrames)"
 								}
@@ -228,6 +233,8 @@ private class SwatchCommand(
 				}
 				av_packet_unref(avPacket.ptr)
 			}
+
+			checkForCompleteGroup(done = true)
 
 			outputPng?.let { writePng(colors, it) }
 			outputTxt?.let { writeTxt(colors, it) }
