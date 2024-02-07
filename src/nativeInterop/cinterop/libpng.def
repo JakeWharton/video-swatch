@@ -1,0 +1,22 @@
+package=com.jakewharton.videoswatch.png
+headers=png.h
+libraryPaths=/opt/homebrew/opt/libpng/lib
+compilerOpts=-I/opt/homebrew/opt/libpng/include
+linkerOpts=-L/opt/homebrew/opt/libpng/lib -lpng
+
+---
+
+static inline jmp_buf* png_jmpbuf2(png_structp p) {
+  return png_jmpbuf(p);
+}
+
+static inline void png_destroy_write_struct2(png_structp png_ptr, png_infop info_ptr) {
+	png_structp* png_ptr_copy = png_ptr;
+	png_infop* info_ptr_copy = info_ptr;
+	png_destroy_write_struct(&png_ptr_copy, &info_ptr_copy);
+}
+
+static inline void png_destroy_info_struct2(png_structp png_ptr, png_infop info_ptr) {
+	png_infop* info_ptr_copy = info_ptr;
+	png_destroy_info_struct(png_ptr, &info_ptr_copy);
+}

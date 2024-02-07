@@ -58,6 +58,8 @@ private class SwatchCommand(
 	private val timeZone: TimeZone,
 ) : CliktCommand(name = "video-swatch") {
 	private val fileName by argument(name = "VIDEO")
+	private val outputPng by option(metavar = "FILE")
+	private val outputTxt by option(metavar = "FILE")
 	private val debug by option().flag()
 
 	private fun debugLog(message: () -> String) {
@@ -146,6 +148,7 @@ private class SwatchCommand(
 			var groupBlueSum = 0.0
 
 			var frameIndex = 0
+			val colors = mutableListOf<RgbColor>()
 
 			while (av_read_frame(formatContext, avPacket.ptr) >= 0) {
 				if (avPacket.stream_index == videoIndex) {
@@ -161,9 +164,19 @@ private class SwatchCommand(
 								groupRemainingFrames--
 								if (groupRemainingFrames < 0) {
 									val groupPixelCount = groupFrameCount * framePixelCount
+
+									val redMean = sqrt(groupRedSum / groupPixelCount).toInt()
+									val greenMean = sqrt(groupGreenSum / groupPixelCount).toInt()
+									val blueMean = sqrt(groupBlueSum / groupPixelCount).toInt()
+									val color = RgbColor(
+										r = redMean.toUByte(),
+										g = greenMean.toUByte(),
+										b = blueMean.toUByte(),
+									)
+
 									debugLog {
 										"""
-										|Group complete!
+										|COLOR $color
 										|  resolution = $width * $height = $framePixelCount
 										|  frames = $groupFrameCount
 										|  pixels = frames * resolution = $groupPixelCount
@@ -172,11 +185,8 @@ private class SwatchCommand(
 										|  blueSum = $groupBlueSum
 										""".trimMargin()
 									}
-									val redMean = sqrt(groupRedSum / groupPixelCount).toInt()
-									val greenMean = sqrt(groupGreenSum / groupPixelCount).toInt()
-									val blueMean = sqrt(groupBlueSum / groupPixelCount).toInt()
-									val mean = (redMean shl 16) or (greenMean shl 8) or blueMean
-									println("#${mean.toString(16).padStart(6, '0')}")
+
+									colors += color
 
 									groupFrameCount = 0
 									// Add instead of assigning to retain fractional remainder.
@@ -218,20 +228,9 @@ private class SwatchCommand(
 				}
 				av_packet_unref(avPacket.ptr)
 			}
-		}
-	}
-}
 
-private inline fun Int.checkReturn(message: () -> String) = apply {
-	check(this >= 0) { message() + " ($this)" }
-}
-
-private fun <T : Any> T?.checkAlloc(name: String? = null) = checkNotNull(this) {
-	buildString {
-		append("Unable to allocate")
-		if (name != null) {
-			append(": ")
-			append(name)
+			outputPng?.let { writePng(colors, it) }
+			outputTxt?.let { writeTxt(colors, it) }
 		}
 	}
 }
