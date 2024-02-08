@@ -31,6 +31,7 @@ import com.jakewharton.videoswatch.ffmpeg.avformat_open_input
 import com.jakewharton.videoswatch.ffmpeg.sws_getContext
 import com.jakewharton.videoswatch.ffmpeg.sws_scale
 import kotlin.math.pow
+import kotlin.math.sqrt
 import kotlin.time.measureTime
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.allocArray
@@ -44,7 +45,6 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import platform.posix.EAGAIN
-import platform.posix.sqrt
 import platform.posix.uint8_tVar
 
 fun main(vararg args: String) {
