@@ -9,7 +9,7 @@ import com.jakewharton.videoswatch.ffmpeg.AVERROR_EOF
 import com.jakewharton.videoswatch.ffmpeg.AVFormatContext
 import com.jakewharton.videoswatch.ffmpeg.AVMEDIA_TYPE_VIDEO
 import com.jakewharton.videoswatch.ffmpeg.AVPacket
-import com.jakewharton.videoswatch.ffmpeg.AV_PIX_FMT_RGB24
+import com.jakewharton.videoswatch.ffmpeg.AV_PIX_FMT_RGB0
 import com.jakewharton.videoswatch.ffmpeg.SWS_BILINEAR
 import com.jakewharton.videoswatch.ffmpeg.av_dump_format
 import com.jakewharton.videoswatch.ffmpeg.av_find_best_stream
@@ -120,11 +120,12 @@ private class SwatchCommand(
 			val height = codecParameters.pointed.height
 			val frameRate = codecParameters.pointed.framerate.num.toFloat() / codecParameters.pointed.framerate.den
 			val framePixelCount = width * height
-			val bufferSize = av_image_get_buffer_size(AV_PIX_FMT_RGB24, width, height, 1)
-			check(bufferSize == framePixelCount * 3)
+			val dstFormat = AV_PIX_FMT_RGB0
+			val bufferSize = av_image_get_buffer_size(dstFormat, width, height, 1)
+			check(bufferSize == framePixelCount * 4)
 			val buffer = allocArray<uint8_tVar>(bufferSize).checkAlloc("buffer")
 
-			av_image_fill_arrays(frameRgb.pointed.data, frameRgb.pointed.linesize, buffer, AV_PIX_FMT_RGB24, width, height, 1)
+			av_image_fill_arrays(frameRgb.pointed.data, frameRgb.pointed.linesize, buffer, dstFormat, width, height, 1)
 
 			val pixelFormat = decoderContext.pointed.pix_fmt
 			val swsContext = sws_getContext(
@@ -133,7 +134,7 @@ private class SwatchCommand(
 				pixelFormat,
 				width,
 				height,
-				AV_PIX_FMT_RGB24,
+				dstFormat,
 				SWS_BILINEAR,
 				null,
 				null,
@@ -232,7 +233,7 @@ private class SwatchCommand(
 
 								val scanPixelsTook = measureTime {
 									val data = frameRgbValue.data[0]!!
-									for (i in 0 until bufferSize step 3) {
+									for (i in 0 until bufferSize step 4) {
 										groupRedSum += data[i].toDouble().pow(2)
 										groupGreenSum += data[i + 1].toDouble().pow(2)
 										groupBlueSum += data[i + 2].toDouble().pow(2)
