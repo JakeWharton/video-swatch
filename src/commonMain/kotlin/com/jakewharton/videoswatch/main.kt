@@ -31,6 +31,7 @@ import com.jakewharton.videoswatch.ffmpeg.avformat_open_input
 import com.jakewharton.videoswatch.ffmpeg.sws_getContext
 import com.jakewharton.videoswatch.ffmpeg.sws_scale
 import kotlin.math.pow
+import kotlin.time.measureTime
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.allocArray
 import kotlinx.cinterop.allocPointerTo
@@ -187,14 +188,29 @@ private class SwatchCommand(
 				}
 			}
 
-			var frameIndex = 0
-			while (av_read_frame(formatContext, avPacket.ptr) >= 0) {
+			var frameIndex = 0U
+			while (true) {
+				val readFrameResult: Int
+				val readFrameTook = measureTime {
+					readFrameResult = av_read_frame(formatContext, avPacket.ptr)
+				}
+				if (readFrameResult < 0) break
+
 				if (avPacket.stream_index == videoIndex) {
-					avcodec_send_packet(decoderContext, avPacket.ptr).checkReturn {
+					val sendPacketResult: Int
+					val sendPacketTook = measureTime {
+						sendPacketResult = avcodec_send_packet(decoderContext, avPacket.ptr)
+					}
+					sendPacketResult.checkReturn {
 						"Error sending packet to decoder"
 					}
+
 					while (true) {
-						when (val ret = avcodec_receive_frame(decoderContext, frame)) {
+						val receiveFrameResult: Int
+						val receiveFrameTook = measureTime {
+							receiveFrameResult = avcodec_receive_frame(decoderContext, frame)
+						}
+						when (receiveFrameResult) {
 							0 -> {
 								val frameValue = frame.pointed
 								val frameRgbValue = frameRgb.pointed
@@ -202,32 +218,45 @@ private class SwatchCommand(
 								groupRemainingFrames--
 								checkForCompleteGroup()
 
-								groupFrameCount++
-								debugLog {
-									"Processing frame $frameIndex (group size: $groupFrameCount, remaining: $groupRemainingFrames)"
+								val conversionTook = measureTime {
+									sws_scale(
+										swsContext,
+										frameValue.data,
+										frameValue.linesize,
+										0,
+										height,
+										frameRgbValue.data,
+										frameRgbValue.linesize,
+									)
 								}
 
-								sws_scale(
-									swsContext,
-									frameValue.data,
-									frameValue.linesize,
-									0,
-									height,
-									frameRgbValue.data,
-									frameRgbValue.linesize,
-								)
-								val data = frameRgbValue.data[0]!!
-								for (i in 0 until bufferSize step 3) {
-									groupRedSum += data[i].toDouble().pow(2)
-									groupGreenSum += data[i + 1].toDouble().pow(2)
-									groupBlueSum += data[i + 2].toDouble().pow(2)
+								val scanPixelsTook = measureTime {
+									val data = frameRgbValue.data[0]!!
+									for (i in 0 until bufferSize step 3) {
+										groupRedSum += data[i].toDouble().pow(2)
+										groupGreenSum += data[i + 1].toDouble().pow(2)
+										groupBlueSum += data[i + 2].toDouble().pow(2)
+									}
 								}
 
 								frameIndex++
+								groupFrameCount++
+								debugLog {
+									"""
+									|FRAME $frameIndex
+									|  group frames processed: $groupFrameCount
+									|  group frames remaining: $groupRemainingFrames
+									|  readFrame: $readFrameTook
+									|  sendPacket: $sendPacketTook
+									|  receiveFrame: $receiveFrameTook
+									|  conversion: $conversionTook
+									|  scanPixels: $scanPixelsTook
+									""".trimMargin()
+								}
 							}
 
 							AVERROR_EOF, -EAGAIN -> break
-							else -> throw IllegalStateException("Error receiving frame $ret")
+							else -> throw IllegalStateException("Error receiving frame $receiveFrameResult")
 						}
 					}
 				}
