@@ -30,7 +30,6 @@ import com.jakewharton.videoswatch.ffmpeg.avformat_find_stream_info
 import com.jakewharton.videoswatch.ffmpeg.avformat_open_input
 import com.jakewharton.videoswatch.ffmpeg.sws_getContext
 import com.jakewharton.videoswatch.ffmpeg.sws_scale
-import kotlin.math.pow
 import kotlin.math.sqrt
 import kotlin.time.measureTime
 import kotlinx.cinterop.alloc
@@ -233,11 +232,21 @@ private class SwatchCommand(
 
 								val scanPixelsTook = measureTime {
 									val data = frameRgbValue.data[0]!!
+
+									var frameRedSum = 0L
+									var frameGreenSum = 0L
+									var frameBlueSum = 0L
 									for (i in 0 until bufferSize step 4) {
-										groupRedSum += data[i].toDouble().pow(2)
-										groupGreenSum += data[i + 1].toDouble().pow(2)
-										groupBlueSum += data[i + 2].toDouble().pow(2)
+										val red = data[i].toInt()
+										frameRedSum += red * red
+										val green = data[i + 1].toInt()
+										frameGreenSum += green * green
+										val blue = data[i + 2].toInt()
+										frameBlueSum += blue * blue
 									}
+									groupRedSum += frameRedSum
+									groupGreenSum += frameGreenSum
+									groupBlueSum += frameBlueSum
 								}
 
 								frameIndex++
