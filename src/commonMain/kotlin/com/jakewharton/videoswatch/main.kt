@@ -143,7 +143,7 @@ private class SwatchCommand(
 
 			val sliceSummarizer = SliceSummarizer(framePixelCount)
 
-			var groupRemainingFrames = frameRate
+			var sliceRemainingFrames = frameRate
 			var sliceIndex = 0
 
 			var frameIndex = 0U
@@ -173,11 +173,11 @@ private class SwatchCommand(
 								val frameValue = frame.pointed
 								val frameRgbValue = frameRgb.pointed
 
-								groupRemainingFrames--
-								if (groupRemainingFrames < 0) {
+								sliceRemainingFrames--
+								if (sliceRemainingFrames < 0) {
 									sliceIndex++
 									// Add instead of assigning to retain fractional remainder.
-									groupRemainingFrames += frameRate
+									sliceRemainingFrames += frameRate
 								}
 
 								val conversionTook = measureTime {
@@ -222,7 +222,7 @@ private class SwatchCommand(
 									"""
 									|FRAME $frameIndex
 									|  slice index: $sliceIndex
-									|  group frames remaining: $groupRemainingFrames
+									|  slice frames remaining: $sliceRemainingFrames
 									|  readFrame: $readFrameTook
 									|  sendPacket: $sendPacketTook
 									|  receiveFrame: $receiveFrameTook
