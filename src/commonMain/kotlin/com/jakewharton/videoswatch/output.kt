@@ -19,7 +19,7 @@ internal fun writeTxt(colors: List<RgbColor>, file: String) = closeFinallyScope 
 	val f = checkNotNull(fopen(file, "w")) { "Unable to open $file for writing" }
 		.scopedUseWithClose(::fclose)
 	for (color in colors) {
-		fprintf(f, color.toString() + "\n")
+		fprintf(f, "$color\n")
 	}
 }
 
