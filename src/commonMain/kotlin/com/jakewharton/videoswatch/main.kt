@@ -30,7 +30,7 @@ import com.jakewharton.videoswatch.ffmpeg.avformat_find_stream_info
 import com.jakewharton.videoswatch.ffmpeg.avformat_open_input
 import com.jakewharton.videoswatch.ffmpeg.sws_getContext
 import com.jakewharton.videoswatch.ffmpeg.sws_scale
-import kotlin.math.pow
+import com.jakewharton.videoswatch.ffmpeg.video_swatch_summarize_frame
 import kotlin.math.sqrt
 import kotlin.time.measureTime
 import kotlinx.cinterop.alloc
@@ -40,6 +40,7 @@ import kotlinx.cinterop.get
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
+import kotlinx.cinterop.useContents
 import kotlinx.cinterop.value
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
@@ -145,9 +146,9 @@ private class SwatchCommand(
 
 			var groupRemainingFrames = frameRate
 			var groupFrameCount = 0
-			var groupRedSum = 0.0
-			var groupGreenSum = 0.0
-			var groupBlueSum = 0.0
+			var groupRedSum = 0L
+			var groupGreenSum = 0L
+			var groupBlueSum = 0L
 
 			val colors = mutableListOf<RgbColor>()
 			fun checkForCompleteGroup(done: Boolean = false) {
@@ -156,9 +157,9 @@ private class SwatchCommand(
 				if (isComplete || done && isHalfway) {
 					val groupPixelCount = groupFrameCount * framePixelCount
 
-					val redMean = sqrt(groupRedSum / groupPixelCount).toInt()
-					val greenMean = sqrt(groupGreenSum / groupPixelCount).toInt()
-					val blueMean = sqrt(groupBlueSum / groupPixelCount).toInt()
+					val redMean = sqrt(groupRedSum.toDouble() / groupPixelCount).toInt()
+					val greenMean = sqrt(groupGreenSum.toDouble() / groupPixelCount).toInt()
+					val blueMean = sqrt(groupBlueSum.toDouble() / groupPixelCount).toInt()
 					val color = RgbColor(
 						r = redMean.toUByte(),
 						g = greenMean.toUByte(),
@@ -183,9 +184,9 @@ private class SwatchCommand(
 					// Add instead of assigning to retain fractional remainder.
 					groupRemainingFrames += frameRate
 
-					groupRedSum = 0.0
-					groupGreenSum = 0.0
-					groupBlueSum = 0.0
+					groupRedSum = 0L
+					groupGreenSum = 0L
+					groupBlueSum = 0L
 				}
 			}
 
@@ -232,11 +233,10 @@ private class SwatchCommand(
 								}
 
 								val scanPixelsTook = measureTime {
-									val data = frameRgbValue.data[0]!!
-									for (i in 0 until bufferSize step 4) {
-										groupRedSum += data[i].toDouble().pow(2)
-										groupGreenSum += data[i + 1].toDouble().pow(2)
-										groupBlueSum += data[i + 2].toDouble().pow(2)
+									video_swatch_summarize_frame(frameRgb, bufferSize).useContents {
+										groupRedSum += reds
+										groupGreenSum += greens
+										groupBlueSum += blues
 									}
 								}
 
