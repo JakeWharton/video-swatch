@@ -28,6 +28,11 @@ kotlin {
 				implementation libs.kotlinx.dateTime
 			}
 		}
+		commonTest {
+			dependencies {
+				implementation libs.assertk
+			}
+		}
 	}
 
 	targets.withType(KotlinNativeTarget).configureEach {

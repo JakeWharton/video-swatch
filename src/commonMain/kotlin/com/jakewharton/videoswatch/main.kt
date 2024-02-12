@@ -30,7 +30,6 @@ import com.jakewharton.videoswatch.ffmpeg.avformat_find_stream_info
 import com.jakewharton.videoswatch.ffmpeg.avformat_open_input
 import com.jakewharton.videoswatch.ffmpeg.sws_getContext
 import com.jakewharton.videoswatch.ffmpeg.sws_scale
-import kotlin.math.sqrt
 import kotlin.time.measureTime
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.allocArray
@@ -142,51 +141,10 @@ private class SwatchCommand(
 
 			val avPacket = alloc<AVPacket>()
 
+			val sliceSummarizer = SliceSummarizer(framePixelCount)
+
 			var groupRemainingFrames = frameRate
-			var groupFrameCount = 0
-			var groupRedSum = 0.0
-			var groupGreenSum = 0.0
-			var groupBlueSum = 0.0
-
-			val colors = mutableListOf<RgbColor>()
-			fun checkForCompleteGroup(done: Boolean = false) {
-				val isComplete = groupRemainingFrames < 0
-				val isHalfway = frameRate - groupRemainingFrames > groupRemainingFrames
-				if (isComplete || done && isHalfway) {
-					val groupPixelCount = groupFrameCount * framePixelCount
-
-					val redMean = sqrt(groupRedSum / groupPixelCount).toInt()
-					val greenMean = sqrt(groupGreenSum / groupPixelCount).toInt()
-					val blueMean = sqrt(groupBlueSum / groupPixelCount).toInt()
-					val color = RgbColor(
-						r = redMean.toUByte(),
-						g = greenMean.toUByte(),
-						b = blueMean.toUByte(),
-					)
-
-					debugLog {
-						"""
-						|COLOR $color
-						|  resolution = $width * $height = $framePixelCount
-						|  frames = $groupFrameCount
-						|  pixels = frames * resolution = $groupPixelCount
-						|  redSum = $groupRedSum
-						|  greenSum = $groupGreenSum
-						|  blueSum = $groupBlueSum
-						""".trimMargin()
-					}
-
-					colors += color
-
-					groupFrameCount = 0
-					// Add instead of assigning to retain fractional remainder.
-					groupRemainingFrames += frameRate
-
-					groupRedSum = 0.0
-					groupGreenSum = 0.0
-					groupBlueSum = 0.0
-				}
-			}
+			var sliceIndex = 0
 
 			var frameIndex = 0U
 			while (true) {
@@ -216,7 +174,11 @@ private class SwatchCommand(
 								val frameRgbValue = frameRgb.pointed
 
 								groupRemainingFrames--
-								checkForCompleteGroup()
+								if (groupRemainingFrames < 0) {
+									sliceIndex++
+									// Add instead of assigning to retain fractional remainder.
+									groupRemainingFrames += frameRate
+								}
 
 								val conversionTook = measureTime {
 									sws_scale(
@@ -244,17 +206,22 @@ private class SwatchCommand(
 										val blue = data[i + 2].toInt()
 										frameBlueSum += blue * blue
 									}
-									groupRedSum += frameRedSum
-									groupGreenSum += frameGreenSum
-									groupBlueSum += frameBlueSum
+
+									sliceSummarizer.addToSlice(
+										slice = sliceIndex,
+										frameSummary = FrameSummary(
+											red = frameRedSum,
+											green = frameGreenSum,
+											blue = frameBlueSum,
+										),
+									)
 								}
 
 								frameIndex++
-								groupFrameCount++
 								debugLog {
 									"""
 									|FRAME $frameIndex
-									|  group frames processed: $groupFrameCount
+									|  slice index: $sliceIndex
 									|  group frames remaining: $groupRemainingFrames
 									|  readFrame: $readFrameTook
 									|  sendPacket: $sendPacketTook
@@ -273,8 +240,7 @@ private class SwatchCommand(
 				av_packet_unref(avPacket.ptr)
 			}
 
-			checkForCompleteGroup(done = true)
-
+			val colors = sliceSummarizer.summarize()
 			outputPng?.let { writePng(colors, it) }
 			outputTxt?.let { writeTxt(colors, it) }
 		}
