@@ -140,3 +140,11 @@ internal inline fun <R> closeOnThrowScope(block: CloserScope.() -> R): R {
 		closer.closeAndRethrow(t)
 	}
 }
+
+internal inline fun <T, R> T.useWithClose(action: (T) -> Unit, block: (T) -> R): R {
+	return try {
+		block(this)
+	} finally {
+		action(this)
+	}
+}

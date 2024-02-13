@@ -47,6 +47,9 @@ import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import platform.posix.EAGAIN
+import platform.posix.fclose
+import platform.posix.fopen
+import platform.posix.fprintf
 import platform.posix.uint8_tVar
 
 fun main(vararg args: String) {
@@ -263,8 +266,15 @@ private class SwatchCommand(
 			println("${frameIndex + 1} frames, $totalFps fps, $totalDuration")
 
 			val colors = sliceSummarizer.summarize()
+
 			outputPng?.let { writePng(colors, it) }
-			outputTxt?.let { writeTxt(colors, it) }
+
+			outputTxt?.let { outputTxt ->
+				val txt = createTxt(colors)
+				fopen(outputTxt, "w").useWithClose(::fclose) {
+					fprintf(it, txt)
+				}
+			}
 		}
 	}
 }

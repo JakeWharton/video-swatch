@@ -11,15 +11,11 @@ import kotlinx.cinterop.convert
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.set
-import platform.posix.fclose
-import platform.posix.fopen
-import platform.posix.fprintf
 
-internal fun writeTxt(colors: List<RgbColor>, file: String) = closeFinallyScope {
-	val f = checkNotNull(fopen(file, "w")) { "Unable to open $file for writing" }
-		.scopedUseWithClose(::fclose)
+internal fun createTxt(colors: List<RgbColor>): String = buildString(colors.size * 8) {
 	for (color in colors) {
-		fprintf(f, "$color\n")
+		append(color)
+		append('\n')
 	}
 }
 
