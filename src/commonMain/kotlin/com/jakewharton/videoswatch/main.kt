@@ -129,7 +129,7 @@ private class SwatchCommand(
 				null,
 			).checkAlloc("swsContext")
 
-			val frameRate = codecParameters.pointed.framerate.num.toFloat() / codecParameters.pointed.framerate.den
+			val frameRate = codecParameters.pointed.framerate.run { num.toFloat() / den }
 			val framePixelCount = frameWidth * frameHeight
 
 			val bufferSize = av_image_get_buffer_size(decodedFormat, frameWidth, frameHeight, 1)
