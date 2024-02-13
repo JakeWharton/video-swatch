@@ -212,13 +212,11 @@ private class SwatchCommand(
 										frameBlueSum += blue * blue
 									}
 
-									sliceSummarizer.addToSlice(
+									sliceSummarizer += FrameSummary(
 										slice = sliceIndex,
-										frameSummary = FrameSummary(
-											red = frameRedSum,
-											green = frameGreenSum,
-											blue = frameBlueSum,
-										),
+										red = frameRedSum,
+										green = frameGreenSum,
+										blue = frameBlueSum,
 									)
 								}
 

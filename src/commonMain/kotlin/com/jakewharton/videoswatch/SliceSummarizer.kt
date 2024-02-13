@@ -3,6 +3,8 @@ package com.jakewharton.videoswatch
 import kotlin.math.sqrt
 
 data class FrameSummary(
+	/** The slice of the video to which this frame belongs. */
+	val slice: Int,
 	/** The sum of the square of each red pixel in a frame. */
 	val red: Long,
 	/** The sum of the square of each green pixel in a frame. */
@@ -33,7 +35,8 @@ class SliceSummarizer(
 		length = newLength
 	}
 
-	fun addToSlice(slice: Int, frameSummary: FrameSummary) {
+	operator fun plusAssign(frameSummary: FrameSummary) {
+		val slice = frameSummary.slice
 		if (slice >= length) {
 			doubleStorage()
 		}
