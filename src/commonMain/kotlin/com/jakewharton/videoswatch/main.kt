@@ -154,89 +154,85 @@ private class SwatchCommand(
 			var sliceRemainingFrames = frameRate
 			var sliceIndex = 0
 
-			var frameIndex = 0U
-			while (true) {
-				val readFrameResult: Int
-				val readFrameTook = measureTime {
-					readFrameResult = av_read_frame(formatContext, avPacket.ptr)
-				}
-				if (readFrameResult < 0) break
-
+			var frameIndex = 0
+			while (av_read_frame(formatContext, avPacket.ptr) >= 0) {
 				if (avPacket.stream_index == videoIndex) {
-					val sendPacketResult: Int
-					val sendPacketTook = measureTime {
-						sendPacketResult = avcodec_send_packet(codecContext, avPacket.ptr)
-					}
-					sendPacketResult.checkReturn {
-						"Error sending packet to decoder"
-					}
-
 					while (true) {
-						val receiveFrameResult: Int
-						val receiveFrameTook = measureTime {
-							receiveFrameResult = avcodec_receive_frame(codecContext, encodedFrame.ptr)
+						when (val sendPacketResult = avcodec_send_packet(codecContext, avPacket.ptr)) {
+							// Packet was accepted by decoder. Break to outer loop to read another.
+							0 -> break
+							// Decoder buffers are full. Continue to inner drain loop before retrying this one.
+							-EAGAIN -> {}
+
+							else -> throw IllegalStateException("Error sending packet to decoder: $sendPacketResult")
 						}
-						when (receiveFrameResult) {
-							0 -> {
-								sliceRemainingFrames--
-								if (sliceRemainingFrames < 0) {
-									sliceIndex++
-									// Add instead of assigning to retain fractional remainder.
-									sliceRemainingFrames += frameRate
-								}
 
-								val conversionTook = measureTime {
-									sws_scale(
-										swsContext,
-										encodedFrame.data,
-										encodedFrame.linesize,
-										0,
-										frameHeight,
-										decodedFrame.data,
-										decodedFrame.linesize,
-									)
-								}
-
-								val scanPixelsTook = measureTime {
-									val data = decodedFrame.data[0]!!
-
-									var frameRedSum = 0L
-									var frameGreenSum = 0L
-									var frameBlueSum = 0L
-									for (i in 0 until bufferSize step 4) {
-										val red = data[i].toInt()
-										frameRedSum += red * red
-										val green = data[i + 1].toInt()
-										frameGreenSum += green * green
-										val blue = data[i + 2].toInt()
-										frameBlueSum += blue * blue
+						while (true) {
+							val receiveFrameResult: Int
+							val receiveFrameTook = measureTime {
+								receiveFrameResult = avcodec_receive_frame(codecContext, encodedFrame.ptr)
+							}
+							when (receiveFrameResult) {
+								0 -> {
+									sliceRemainingFrames--
+									if (sliceRemainingFrames < 0) {
+										sliceIndex++
+										// Add instead of assigning to retain fractional remainder.
+										sliceRemainingFrames += frameRate
 									}
 
-									sliceSummarizer += FrameSummary(
-										slice = sliceIndex,
-										red = frameRedSum,
-										green = frameGreenSum,
-										blue = frameBlueSum,
-									)
+									val conversionTook = measureTime {
+										sws_scale(
+											swsContext,
+											encodedFrame.data,
+											encodedFrame.linesize,
+											0,
+											frameHeight,
+											decodedFrame.data,
+											decodedFrame.linesize,
+										)
+									}
+
+									val scanPixelsTook = measureTime {
+										val data = decodedFrame.data[0]!!
+
+										var frameRedSum = 0L
+										var frameGreenSum = 0L
+										var frameBlueSum = 0L
+										for (i in 0 until bufferSize step 4) {
+											val red = data[i].toInt()
+											frameRedSum += red * red
+											val green = data[i + 1].toInt()
+											frameGreenSum += green * green
+											val blue = data[i + 2].toInt()
+											frameBlueSum += blue * blue
+										}
+
+										sliceSummarizer += FrameSummary(
+											slice = sliceIndex,
+											red = frameRedSum,
+											green = frameGreenSum,
+											blue = frameBlueSum,
+										)
+									}
+
+									frameIndex++
+
+									debugLog {
+										"""
+										|FRAME $frameIndex
+										|  slice index: $sliceIndex
+										|  slice frames remaining: $sliceRemainingFrames
+										|  receiveFrame: $receiveFrameTook
+										|  conversion: $conversionTook
+										|  scanPixels: $scanPixelsTook
+										""".trimMargin()
+									}
 								}
 
-								frameIndex++
-								debugLog {
-									"""
-									|FRAME $frameIndex
-									|  slice index: $sliceIndex
-									|  slice frames remaining: $sliceRemainingFrames
-									|  readFrame: $readFrameTook
-									|  sendPacket: $sendPacketTook
-									|  receiveFrame: $receiveFrameTook
-									|  conversion: $conversionTook
-									|  scanPixels: $scanPixelsTook
-									""".trimMargin()
-								}
+								AVERROR_EOF, -EAGAIN -> break
+								else -> throw IllegalStateException("Error receiving frame $receiveFrameResult")
 							}
-
-							AVERROR_EOF, -EAGAIN -> break
-							else -> throw IllegalStateException("Error receiving frame $receiveFrameResult")
 						}
 					}
 				}
