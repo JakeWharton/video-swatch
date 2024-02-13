@@ -174,13 +174,6 @@ private class SwatchCommand(
 							}
 							when (receiveFrameResult) {
 								0 -> {
-									sliceRemainingFrames--
-									if (sliceRemainingFrames < 0) {
-										sliceIndex++
-										// Add instead of assigning to retain fractional remainder.
-										sliceRemainingFrames += frameRate
-									}
-
 									val conversionTook = measureTime {
 										sws_scale(
 											swsContext,
@@ -228,6 +221,15 @@ private class SwatchCommand(
 										|  scanPixels: $scanPixelsTook
 										""".trimMargin()
 									}
+
+									sliceRemainingFrames--
+									if (sliceRemainingFrames < 0) {
+										sliceIndex++
+										// Add instead of assigning to retain fractional remainder.
+										sliceRemainingFrames += frameRate
+									}
+
+									frameIndex++
 								}
 
 								AVERROR_EOF, -EAGAIN -> break
