@@ -1,3 +1,5 @@
+@file:Suppress("DEPRECATION")
+
 package com.jakewharton.videoswatch
 
 import com.github.ajalt.clikt.core.CliktCommand
@@ -30,6 +32,8 @@ import com.jakewharton.videoswatch.ffmpeg.avformat_find_stream_info
 import com.jakewharton.videoswatch.ffmpeg.avformat_open_input
 import com.jakewharton.videoswatch.ffmpeg.sws_getContext
 import com.jakewharton.videoswatch.ffmpeg.sws_scale
+import kotlin.system.getTimeNanos
+import kotlin.time.Duration.Companion.nanoseconds
 import kotlin.time.measureTime
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.allocArray
@@ -155,6 +159,9 @@ private class SwatchCommand(
 			var sliceIndex = 0
 
 			var frameIndex = 0
+			var lastFrameIndex = frameIndex
+			val firstFrameTime = getTimeNanos()
+			var lastFrameTime = firstFrameTime
 			while (av_read_frame(formatContext, avPacket.ptr) >= 0) {
 				if (avPacket.stream_index == videoIndex) {
 					while (true) {
@@ -209,7 +216,15 @@ private class SwatchCommand(
 										)
 									}
 
-									frameIndex++
+									val timeNanos = getTimeNanos()
+									val timeDelta = timeNanos - lastFrameTime
+									if (timeDelta > 1_000_000_000L) {
+										lastFrameTime = timeNanos
+										val frames = frameIndex - lastFrameIndex
+										val avg = frameIndex / ((timeNanos - firstFrameTime) / 1_000_000_000)
+										println("${frameIndex + 1} frames processed, $frames fps ($avg average)")
+										lastFrameIndex = frameIndex
+									}
 
 									debugLog {
 										"""
@@ -240,6 +255,12 @@ private class SwatchCommand(
 				}
 				av_packet_unref(avPacket.ptr)
 			}
+
+			val totalNanos = getTimeNanos() - firstFrameTime
+			val totalDuration = totalNanos.nanoseconds
+			val totalFps = frameIndex / (totalNanos / 1_000_000_000)
+			println()
+			println("${frameIndex + 1} frames, $totalFps fps, $totalDuration")
 
 			val colors = sliceSummarizer.summarize()
 			outputPng?.let { writePng(colors, it) }
