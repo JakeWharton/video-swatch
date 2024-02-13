@@ -146,8 +146,6 @@ private class SwatchCommand(
 				.pointed
 			av_image_fill_arrays(decodedFrame.data, decodedFrame.linesize, decodedBuffer, decodedFormat, frameWidth, frameHeight, 1)
 
-			val avPacket = alloc<AVPacket>()
-
 			val encodedFrame = av_frame_alloc()
 				.checkAlloc("encodedFrame")
 				.scopedUseWithClose(::av_free)
@@ -162,6 +160,8 @@ private class SwatchCommand(
 			var lastFrameIndex = frameIndex
 			val firstFrameTime = getTimeNanos()
 			var lastFrameTime = firstFrameTime
+
+			val avPacket = alloc<AVPacket>()
 			while (av_read_frame(formatContext, avPacket.ptr) >= 0) {
 				if (avPacket.stream_index == videoIndex) {
 					while (true) {
