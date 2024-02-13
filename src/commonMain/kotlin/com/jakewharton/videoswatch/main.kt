@@ -89,57 +89,65 @@ private class SwatchCommand(
 				av_dump_format(formatContext, 0, fileName, 0)
 			}
 
-			val decoderVar = allocPointerTo<AVCodec>()
-			val videoIndex = av_find_best_stream(formatContext, AVMEDIA_TYPE_VIDEO, -1, -1, decoderVar.ptr, 0).checkReturn {
+			val codecVar = allocPointerTo<AVCodec>()
+			val videoIndex = av_find_best_stream(formatContext, AVMEDIA_TYPE_VIDEO, -1, -1, codecVar.ptr, 0).checkReturn {
 				"Didn't find a video stream"
 			}
-			val decoder = decoderVar.value!!
+			val codec = codecVar.value!!
 			debugLog { "Found video stream (index: $videoIndex)" }
 
 			val codecParameters = formatContext.pointed.streams!![videoIndex]!!.pointed.codecpar!!
-			val decoderContext = avcodec_alloc_context3(decoder)
-				.checkAlloc("decoderContext")
+			val codecContext = avcodec_alloc_context3(codec)
+				.checkAlloc("codecContext")
 				.scopedUseWithClose(::avcodec_free_context2)
 
-			avcodec_parameters_to_context(decoderContext, codecParameters).checkReturn {
+			avcodec_parameters_to_context(codecContext, codecParameters).checkReturn {
 				"Cannot copy parameters to context"
 			}
 			debugLog { "Parameters copied to context" }
 
-			avcodec_open2(decoderContext, decoder, null).checkReturn {
+			avcodec_open2(codecContext, codec, null).checkReturn {
 				"Cannot open codec"
 			}
 			debugLog { "Opened codec" }
 
-			val frame = av_frame_alloc().checkAlloc("frame").scopedUseWithClose(::av_free)
-			val frameRgb = av_frame_alloc().checkAlloc("frameRgb").scopedUseWithClose(::av_free)
+			val frameWidth = codecContext.pointed.width
+			val frameHeight = codecContext.pointed.height
+			val encodedFormat = codecContext.pointed.pix_fmt
+			val decodedFormat = AV_PIX_FMT_RGB0
 
-			val width = codecParameters.pointed.width
-			val height = codecParameters.pointed.height
-			val frameRate = codecParameters.pointed.framerate.num.toFloat() / codecParameters.pointed.framerate.den
-			val framePixelCount = width * height
-			val dstFormat = AV_PIX_FMT_RGB0
-			val bufferSize = av_image_get_buffer_size(dstFormat, width, height, 1)
-			check(bufferSize == framePixelCount * 4)
-			val buffer = allocArray<uint8_tVar>(bufferSize).checkAlloc("buffer")
-
-			av_image_fill_arrays(frameRgb.pointed.data, frameRgb.pointed.linesize, buffer, dstFormat, width, height, 1)
-
-			val pixelFormat = decoderContext.pointed.pix_fmt
 			val swsContext = sws_getContext(
-				width,
-				height,
-				pixelFormat,
-				width,
-				height,
-				dstFormat,
+				frameWidth,
+				frameHeight,
+				encodedFormat,
+				frameWidth,
+				frameHeight,
+				decodedFormat,
 				SWS_BILINEAR,
 				null,
 				null,
 				null,
 			).checkAlloc("swsContext")
 
+			val frameRate = codecParameters.pointed.framerate.num.toFloat() / codecParameters.pointed.framerate.den
+			val framePixelCount = frameWidth * frameHeight
+
+			val bufferSize = av_image_get_buffer_size(decodedFormat, frameWidth, frameHeight, 1)
+			check(bufferSize == framePixelCount * 4)
+			val decodedBuffer = allocArray<uint8_tVar>(bufferSize)
+				.checkAlloc("decodedBuffer")
+			val decodedFrame = av_frame_alloc()
+				.checkAlloc("decodedFrame")
+				.scopedUseWithClose(::av_free)
+				.pointed
+			av_image_fill_arrays(decodedFrame.data, decodedFrame.linesize, decodedBuffer, decodedFormat, frameWidth, frameHeight, 1)
+
 			val avPacket = alloc<AVPacket>()
+
+			val encodedFrame = av_frame_alloc()
+				.checkAlloc("encodedFrame")
+				.scopedUseWithClose(::av_free)
+				.pointed
 
 			val sliceSummarizer = SliceSummarizer(framePixelCount)
 
@@ -157,7 +165,7 @@ private class SwatchCommand(
 				if (avPacket.stream_index == videoIndex) {
 					val sendPacketResult: Int
 					val sendPacketTook = measureTime {
-						sendPacketResult = avcodec_send_packet(decoderContext, avPacket.ptr)
+						sendPacketResult = avcodec_send_packet(codecContext, avPacket.ptr)
 					}
 					sendPacketResult.checkReturn {
 						"Error sending packet to decoder"
@@ -166,13 +174,10 @@ private class SwatchCommand(
 					while (true) {
 						val receiveFrameResult: Int
 						val receiveFrameTook = measureTime {
-							receiveFrameResult = avcodec_receive_frame(decoderContext, frame)
+							receiveFrameResult = avcodec_receive_frame(codecContext, encodedFrame.ptr)
 						}
 						when (receiveFrameResult) {
 							0 -> {
-								val frameValue = frame.pointed
-								val frameRgbValue = frameRgb.pointed
-
 								sliceRemainingFrames--
 								if (sliceRemainingFrames < 0) {
 									sliceIndex++
@@ -183,17 +188,17 @@ private class SwatchCommand(
 								val conversionTook = measureTime {
 									sws_scale(
 										swsContext,
-										frameValue.data,
-										frameValue.linesize,
+										encodedFrame.data,
+										encodedFrame.linesize,
 										0,
-										height,
-										frameRgbValue.data,
-										frameRgbValue.linesize,
+										frameHeight,
+										decodedFrame.data,
+										decodedFrame.linesize,
 									)
 								}
 
 								val scanPixelsTook = measureTime {
-									val data = frameRgbValue.data[0]!!
+									val data = decodedFrame.data[0]!!
 
 									var frameRedSum = 0L
 									var frameGreenSum = 0L
