@@ -5,14 +5,14 @@ import assertk.assertions.isEmpty
 import assertk.assertions.isEqualTo
 import kotlin.test.Test
 
-class OutputTxtTest {
+class RenderTxtTest {
 	@Test fun empty() {
-		assertThat(createTxt(emptyList())).isEmpty()
+		assertThat(renderTxt(emptyList())).isEmpty()
 	}
 
 	@Test fun one() {
 		assertThat(
-			createTxt(
+			renderTxt(
 				listOf(
 					RgbColor(r = 16.toUByte(), 32.toUByte(), 64.toUByte()),
 				),
@@ -27,7 +27,7 @@ class OutputTxtTest {
 
 	@Test fun many() {
 		assertThat(
-			createTxt(
+			renderTxt(
 				listOf(
 					RgbColor(r = 16.toUByte(), 32.toUByte(), 64.toUByte()),
 					RgbColor(r = 33.toUByte(), 1.toUByte(), 154.toUByte()),

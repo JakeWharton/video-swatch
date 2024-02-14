@@ -4,6 +4,7 @@ package com.jakewharton.videoswatch
 
 import com.github.ajalt.clikt.core.CliktCommand
 import com.github.ajalt.clikt.parameters.arguments.argument
+import com.github.ajalt.clikt.parameters.options.convert
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
 import com.jakewharton.videoswatch.ffmpeg.AVCodec
@@ -46,26 +47,27 @@ import kotlinx.cinterop.value
 import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
+import okio.FileSystem
+import okio.Path.Companion.toPath
 import platform.posix.EAGAIN
-import platform.posix.fclose
-import platform.posix.fopen
-import platform.posix.fprintf
 import platform.posix.uint8_tVar
 
 fun main(vararg args: String) {
 	SwatchCommand(
 		clock = Clock.System,
 		timeZone = TimeZone.currentSystemDefault(),
+		outputFs = FileSystem.SYSTEM,
 	).main(args)
 }
 
 private class SwatchCommand(
 	private val clock: Clock,
 	private val timeZone: TimeZone,
+	private val outputFs: FileSystem,
 ) : CliktCommand(name = "video-swatch") {
 	private val fileName by argument(name = "VIDEO")
-	private val outputPng by option(metavar = "FILE")
-	private val outputTxt by option(metavar = "FILE")
+	private val outputPng by option(metavar = "FILE").convert { it.toPath() }
+	private val outputTxt by option(metavar = "FILE").convert { it.toPath() }
 	private val debug by option().flag()
 
 	private fun debugLog(message: () -> String) {
@@ -267,12 +269,17 @@ private class SwatchCommand(
 
 			val colors = sliceSummarizer.summarize()
 
-			outputPng?.let { writePng(colors, it) }
+			outputPng?.let { outputPng ->
+				val png = renderPng(colors)
+				outputFs.write(outputPng) {
+					write(png)
+				}
+			}
 
 			outputTxt?.let { outputTxt ->
-				val txt = createTxt(colors)
-				fopen(outputTxt, "w").useWithClose(::fclose) {
-					fprintf(it, txt)
+				val txt = renderTxt(colors)
+				outputFs.write(outputTxt) {
+					writeUtf8(txt)
 				}
 			}
 		}
