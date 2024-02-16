@@ -7,6 +7,7 @@ import com.github.ajalt.clikt.parameters.arguments.argument
 import com.github.ajalt.clikt.parameters.options.convert
 import com.github.ajalt.clikt.parameters.options.flag
 import com.github.ajalt.clikt.parameters.options.option
+import com.github.ajalt.clikt.parameters.types.int
 import com.jakewharton.videoswatch.ffmpeg.AVCodec
 import com.jakewharton.videoswatch.ffmpeg.AVERROR_EOF
 import com.jakewharton.videoswatch.ffmpeg.AVFormatContext
@@ -68,6 +69,8 @@ private class SwatchCommand(
 	private val fileName by argument(name = "VIDEO")
 	private val outputPng by option(metavar = "FILE").convert { it.toPath() }
 	private val outputTxt by option(metavar = "FILE").convert { it.toPath() }
+	private val cropHeight by option(metavar = "PIXELS").int()
+	private val cropWidth by option(metavar = "PIXELS").int()
 	private val debug by option().flag()
 
 	private fun debugLog(message: () -> String) {
@@ -139,10 +142,9 @@ private class SwatchCommand(
 			).checkAlloc("swsContext")
 
 			val frameRate = codecParameters.pointed.framerate.run { num.toFloat() / den }
-			val framePixelCount = frameWidth * frameHeight
 
 			val bufferSize = av_image_get_buffer_size(decodedFormat, frameWidth, frameHeight, 1)
-			check(bufferSize == framePixelCount * 4)
+			check(bufferSize == frameWidth * frameHeight * 4)
 			val decodedBuffer = allocArray<uint8_tVar>(bufferSize)
 				.checkAlloc("decodedBuffer")
 			val decodedFrame = av_frame_alloc()
@@ -156,6 +158,17 @@ private class SwatchCommand(
 				.scopedUseWithClose(::av_free)
 				.pointed
 
+			val frameXStart = cropWidth?.let { (frameWidth - it) / 2 } ?: 0
+			val frameXEnd = frameXStart + (cropWidth ?: frameWidth)
+			val frameYStart = cropHeight?.let { (frameHeight - it) / 2 } ?: 0
+			val frameYEnd = frameYStart + (cropHeight ?: frameHeight)
+			require(frameXStart >= 0) { "Expected crop width $cropWidth <= frame width $frameWidth"}
+			require(frameYStart >= 0) { "Expected crop height $cropHeight <= frame height $frameHeight"}
+			debugLog {
+				"Sampling pixel rows $frameYStart..${frameYEnd - 1}, columns $frameXStart..${frameXEnd - 1}"
+			}
+
+			val framePixelCount = (cropWidth ?: frameWidth) * (cropHeight ?: frameHeight)
 			val sliceSummarizer = SliceSummarizer(framePixelCount)
 
 			var sliceRemainingFrames = frameRate
@@ -204,13 +217,18 @@ private class SwatchCommand(
 										var frameRedSum = 0L
 										var frameGreenSum = 0L
 										var frameBlueSum = 0L
-										for (i in 0 until bufferSize step 4) {
-											val red = data[i].toInt()
-											frameRedSum += red * red
-											val green = data[i + 1].toInt()
-											frameGreenSum += green * green
-											val blue = data[i + 2].toInt()
-											frameBlueSum += blue * blue
+										for (y in frameYStart until frameYEnd) {
+											val yOffset = y * frameWidth * 4
+											for (x in frameXStart until frameXEnd) {
+												val offset = yOffset + x * 4
+
+												val red = data[offset].toInt()
+												frameRedSum += red * red
+												val green = data[offset + 1].toInt()
+												frameGreenSum += green * green
+												val blue = data[offset + 2].toInt()
+												frameBlueSum += blue * blue
+											}
 										}
 
 										sliceSummarizer += FrameSummary(
