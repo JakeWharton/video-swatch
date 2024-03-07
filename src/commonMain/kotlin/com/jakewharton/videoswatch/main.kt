@@ -162,8 +162,8 @@ private class SwatchCommand(
 			val frameXEnd = frameXStart + (cropWidth ?: frameWidth)
 			val frameYStart = cropHeight?.let { (frameHeight - it) / 2 } ?: 0
 			val frameYEnd = frameYStart + (cropHeight ?: frameHeight)
-			require(frameXStart >= 0) { "Expected crop width $cropWidth <= frame width $frameWidth"}
-			require(frameYStart >= 0) { "Expected crop height $cropHeight <= frame height $frameHeight"}
+			require(frameXStart >= 0) { "Expected crop width $cropWidth <= frame width $frameWidth" }
+			require(frameYStart >= 0) { "Expected crop height $cropHeight <= frame height $frameHeight" }
 			debugLog {
 				"Sampling pixel rows $frameYStart..${frameYEnd - 1}, columns $frameXStart..${frameXEnd - 1}"
 			}
