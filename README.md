@@ -2,6 +2,8 @@
 
 Extract a per-frame color from video and render to an image.
 
+![Example output from The Iron Giant showing thousands of single-color vertical lines consisting mostly of dark blues and oranges with some light blue sections towards the end.](example.png)
+
 
 # License
 
