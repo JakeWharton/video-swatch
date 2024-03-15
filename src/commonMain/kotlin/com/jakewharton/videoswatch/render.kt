@@ -11,12 +11,11 @@ import kotlinx.cinterop.allocArray
 import kotlinx.cinterop.convert
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.ptr
-import kotlinx.cinterop.readBytes
 import kotlinx.cinterop.set
 import kotlinx.cinterop.toKString
 import kotlinx.cinterop.value
 import okio.ByteString
-import okio.ByteString.Companion.toByteString
+import okio.readByteString
 import platform.posix.uint8_tVar
 
 internal fun renderTxt(colors: List<RgbColor>): String = buildString(colors.size * 8) {
@@ -83,6 +82,5 @@ internal fun renderPng(colors: List<RgbColor>): ByteString = memScoped {
 		"Buffer write failed: ${png.message.toKString()}"
 	}
 
-	// https://github.com/square/okio/issues/1431
-	return pngBytes.readBytes(pngSize).toByteString()
+	return pngBytes.readByteString(pngSize)
 }
