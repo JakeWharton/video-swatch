@@ -4,7 +4,7 @@ kotlin = "1.9.24"
 [libraries]
 kotlin-gradlePlugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
 spotless-gradlePlugin = "com.diffplug.spotless:spotless-plugin-gradle:6.25.0"
-kotlinx-dateTime = "org.jetbrains.kotlinx:kotlinx-datetime:0.5.0"
+kotlinx-dateTime = "org.jetbrains.kotlinx:kotlinx-datetime:0.6.0"
 ktlint = "com.pinterest.ktlint:ktlint-cli:1.2.1"
 clikt = "com.github.ajalt.clikt:clikt:4.4.0"
 assertk = "com.willowtreeapps.assertk:assertk:0.28.1"
