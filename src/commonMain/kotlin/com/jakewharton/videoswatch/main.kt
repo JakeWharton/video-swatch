@@ -35,8 +35,8 @@ import com.jakewharton.videoswatch.ffmpeg.avformat_find_stream_info
 import com.jakewharton.videoswatch.ffmpeg.avformat_open_input
 import com.jakewharton.videoswatch.ffmpeg.sws_getContext
 import com.jakewharton.videoswatch.ffmpeg.sws_scale
-import kotlin.system.getTimeNanos
-import kotlin.time.Duration.Companion.nanoseconds
+import kotlin.time.Duration.Companion.seconds
+import kotlin.time.TimeSource
 import kotlin.time.measureTime
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.allocArray
@@ -177,7 +177,7 @@ private class SwatchCommand(
 
 			var frameIndex = 0
 			var lastFrameIndex = frameIndex
-			val firstFrameTime = getTimeNanos()
+			val firstFrameTime = TimeSource.Monotonic.markNow()
 			var lastFrameTime = firstFrameTime
 
 			val avPacket = alloc<AVPacket>()
@@ -240,12 +240,10 @@ private class SwatchCommand(
 										)
 									}
 
-									val timeNanos = getTimeNanos()
-									val timeDelta = timeNanos - lastFrameTime
-									if (timeDelta > 1_000_000_000L) {
-										lastFrameTime = timeNanos
+									if (lastFrameTime.elapsedNow() > 1.seconds) {
+										lastFrameTime = TimeSource.Monotonic.markNow()
 										val frames = frameIndex - lastFrameIndex
-										val avg = frameIndex / ((timeNanos - firstFrameTime) / 1_000_000_000)
+										val avg = frameIndex / firstFrameTime.elapsedNow().inWholeSeconds
 										println("${frameIndex + 1} frames processed, $frames fps ($avg average)")
 										lastFrameIndex = frameIndex
 									}
@@ -280,9 +278,8 @@ private class SwatchCommand(
 				av_packet_unref(avPacket.ptr)
 			}
 
-			val totalNanos = getTimeNanos() - firstFrameTime
-			val totalDuration = totalNanos.nanoseconds
-			val totalFps = frameIndex / (totalNanos / 1_000_000_000)
+			val totalDuration = firstFrameTime.elapsedNow()
+			val totalFps = frameIndex / totalDuration.inWholeSeconds
 			println()
 			println("${frameIndex + 1} frames, $totalFps fps, $totalDuration")
 
