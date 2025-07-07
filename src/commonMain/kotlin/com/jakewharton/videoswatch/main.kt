@@ -35,6 +35,7 @@ import com.jakewharton.videoswatch.ffmpeg.avformat_find_stream_info
 import com.jakewharton.videoswatch.ffmpeg.avformat_open_input
 import com.jakewharton.videoswatch.ffmpeg.sws_getContext
 import com.jakewharton.videoswatch.ffmpeg.sws_scale
+import kotlin.time.Clock
 import kotlin.time.Duration.Companion.seconds
 import kotlin.time.TimeSource
 import kotlin.time.measureTime
@@ -46,7 +47,6 @@ import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.pointed
 import kotlinx.cinterop.ptr
 import kotlinx.cinterop.value
-import kotlinx.datetime.Clock
 import kotlinx.datetime.TimeZone
 import kotlinx.datetime.toLocalDateTime
 import okio.FileSystem
