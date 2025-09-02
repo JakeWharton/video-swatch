@@ -42,6 +42,7 @@ import kotlin.time.measureTime
 import kotlinx.cinterop.alloc
 import kotlinx.cinterop.allocArray
 import kotlinx.cinterop.allocPointerTo
+import kotlinx.cinterop.convert
 import kotlinx.cinterop.get
 import kotlinx.cinterop.memScoped
 import kotlinx.cinterop.pointed
@@ -136,7 +137,7 @@ private class SwatchCommand(
 				frameWidth,
 				frameHeight,
 				decodedFormat,
-				SWS_BILINEAR,
+				SWS_BILINEAR.convert(),
 				null,
 				null,
 				null,
