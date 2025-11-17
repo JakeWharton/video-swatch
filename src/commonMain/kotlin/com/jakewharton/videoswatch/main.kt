@@ -188,6 +188,7 @@ private class SwatchCommand(
 						when (val sendPacketResult = avcodec_send_packet(codecContext, avPacket.ptr)) {
 							// Packet was accepted by decoder. Break to outer loop to read another.
 							0 -> break
+
 							// Decoder buffers are full. Continue to inner drain loop before retrying this one.
 							-EAGAIN -> {}
 
@@ -271,6 +272,7 @@ private class SwatchCommand(
 								}
 
 								AVERROR_EOF, -EAGAIN -> break
+
 								else -> throw IllegalStateException("Error receiving frame $receiveFrameResult")
 							}
 						}
