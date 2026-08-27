@@ -3,7 +3,7 @@ kotlin = "2.4.10"
 
 [libraries]
 kotlin-gradlePlugin = { module = "org.jetbrains.kotlin:kotlin-gradle-plugin", version.ref = "kotlin" }
-spotless-gradlePlugin = "com.diffplug.spotless:spotless-plugin-gradle:8.10.0"
+spotless-gradlePlugin = "com.diffplug.spotless:spotless-plugin-gradle:8.10.1"
 kotlinx-dateTime = "org.jetbrains.kotlinx:kotlinx-datetime:0.8.0"
 ktlint = "com.pinterest.ktlint:ktlint-cli:1.8.0"
 clikt = "com.github.ajalt.clikt:clikt:5.1.0"
